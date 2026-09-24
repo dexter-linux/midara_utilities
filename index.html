@@ -1,0 +1,248 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Midara Utilities – Compress & Convert</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">◈</span>
+        <span class="logo-text">Midara <span>Utilities</span></span>
+      </div>
+      <p class="tagline">Compress DOCX • PDF • PNG • JPEG & convert images — private & open-source</p>
+    </header>
+
+    <!-- Main card -->
+    <main class="card">
+      <!-- Drop zone -->
+      <div id="dropzone" class="dropzone">
+        <div class="dropzone-content">
+          <div class="upload-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+          <h2>Drop your file here</h2>
+          <p>or <label for="fileInput" class="link">browse</label></p>
+          <p class="formats">Supports DOCX, PDF, PNG, JPEG</p>
+          <input type="file" id="fileInput" accept=".docx,.pdf,.png,.jpg,.jpeg" hidden />
+        </div>
+      </div>
+
+      <!-- Options (shown after file selected) -->
+      <div id="options" class="options hidden">
+        <div class="file-info">
+          <div class="file-icon" id="fileIcon">📄</div>
+          <div>
+            <div class="file-name" id="fileName">—</div>
+            <div class="file-size" id="fileSize">—</div>
+          </div>
+          <button type="button" class="btn-clear" id="clearBtn" title="Clear">×</button>
+        </div>
+
+        <div class="controls">
+          <div class="control-group">
+            <label for="quality">Quality / Compression</label>
+            <div class="slider-row">
+              <input type="range" id="quality" min="10" max="95" value="75" />
+              <span id="qualityValue">75</span>
+            </div>
+            <p class="hint">Lower = smaller file, higher = better quality</p>
+          </div>
+
+          <div class="control-group" id="convertGroup">
+            <label>Convert image to</label>
+            <div class="radio-group">
+              <label class="radio"><input type="radio" name="convert" value="" checked /> Keep original</label>
+              <label class="radio"><input type="radio" name="convert" value="JPEG" /> JPEG</label>
+              <label class="radio"><input type="radio" name="convert" value="PNG" /> PNG</label>
+            </div>
+          </div>
+        </div>
+
+        <button type="button" id="processBtn" class="btn-primary">
+          <span class="btn-text">Compress</span>
+          <span class="spinner hidden"></span>
+        </button>
+      </div>
+
+      <!-- Result -->
+      <div id="result" class="result hidden">
+        <div class="result-success">
+          <div class="check">✓</div>
+          <h3>Done!</h3>
+          <p id="resultMessage">—</p>
+          <div class="size-comparison">
+            <div>
+              <span class="label">Original</span>
+              <span id="origSize">—</span>
+            </div>
+            <div class="arrow">→</div>
+            <div>
+              <span class="label">Compressed</span>
+              <span id="newSize">—</span>
+            </div>
+          </div>
+          <a id="downloadBtn" class="btn-primary" href="#">Download</a>
+          <button type="button" id="againBtn" class="btn-secondary">Process another file</button>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div id="error" class="error hidden">
+        <p id="errorMessage">Something went wrong</p>
+        <button type="button" id="errorClose" class="btn-secondary">Try again</button>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>Midara Utilities • Open source • Files processed locally on your server</p>
+    </footer>
+  </div>
+
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const options = document.getElementById('options');
+    const result = document.getElementById('result');
+    const errorBox = document.getElementById('error');
+    const processBtn = document.getElementById('processBtn');
+    const qualitySlider = document.getElementById('quality');
+    const qualityValue = document.getElementById('qualityValue');
+    const convertGroup = document.getElementById('convertGroup');
+
+    let selectedFile = null;
+
+    // Drag & drop
+    ['dragenter', 'dragover'].forEach(evt => {
+      dropzone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+      });
+    });
+    ['dragleave', 'drop'].forEach(evt => {
+      dropzone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+      });
+    });
+    dropzone.addEventListener('drop', e => {
+      const files = e.dataTransfer.files;
+      if (files.length) handleFile(files[0]);
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) handleFile(fileInput.files[0]);
+    });
+
+    qualitySlider.addEventListener('input', () => {
+      qualityValue.textContent = qualitySlider.value;
+    });
+
+    function handleFile(file) {
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (!['docx', 'pdf', 'png', 'jpg', 'jpeg'].includes(ext)) {
+        showError('Unsupported file type. Please use DOCX, PDF, PNG or JPEG.');
+        return;
+      }
+      selectedFile = file;
+      document.getElementById('fileName').textContent = file.name;
+      document.getElementById('fileSize').textContent = formatBytes(file.size);
+
+      // Icon
+      const icons = { docx: '📝', pdf: '📕', png: '🖼️', jpg: '🖼️', jpeg: '🖼️' };
+      document.getElementById('fileIcon').textContent = icons[ext] || '📄';
+
+      // Show convert only for images
+      convertGroup.style.display = ['png', 'jpg', 'jpeg'].includes(ext) ? 'block' : 'none';
+
+      dropzone.classList.add('hidden');
+      options.classList.remove('hidden');
+      result.classList.add('hidden');
+      errorBox.classList.add('hidden');
+    }
+
+    document.getElementById('clearBtn').addEventListener('click', reset);
+    document.getElementById('againBtn').addEventListener('click', reset);
+    document.getElementById('errorClose').addEventListener('click', reset);
+
+    function reset() {
+      selectedFile = null;
+      fileInput.value = '';
+      dropzone.classList.remove('hidden');
+      options.classList.add('hidden');
+      result.classList.add('hidden');
+      errorBox.classList.add('hidden');
+      processBtn.disabled = false;
+      processBtn.querySelector('.btn-text').textContent = 'Compress';
+      processBtn.querySelector('.spinner').classList.add('hidden');
+    }
+
+    processBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+
+      processBtn.disabled = true;
+      processBtn.querySelector('.btn-text').textContent = 'Processing…';
+      processBtn.querySelector('.spinner').classList.remove('hidden');
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('quality', qualitySlider.value);
+
+      const convert = document.querySelector('input[name="convert"]:checked')?.value || '';
+      if (convert) formData.append('convert_to', convert);
+
+      try {
+        const res = await fetch('/api/process', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          showError(data.error || 'Processing failed');
+          return;
+        }
+
+        // Show result
+        options.classList.add('hidden');
+        result.classList.remove('hidden');
+        document.getElementById('resultMessage').textContent = data.message;
+        document.getElementById('origSize').textContent = formatBytes(data.original_size);
+        document.getElementById('newSize').textContent = formatBytes(data.compressed_size);
+        document.getElementById('downloadBtn').href = `/api/download/${data.download_id}`;
+        document.getElementById('downloadBtn').download = data.output_name;
+      } catch (err) {
+        showError('Network error. Please try again.');
+      } finally {
+        processBtn.disabled = false;
+        processBtn.querySelector('.btn-text').textContent = 'Compress';
+        processBtn.querySelector('.spinner').classList.add('hidden');
+      }
+    });
+
+    function showError(msg) {
+      options.classList.add('hidden');
+      dropzone.classList.add('hidden');
+      result.classList.add('hidden');
+      errorBox.classList.remove('hidden');
+      document.getElementById('errorMessage').textContent = msg;
+    }
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+  </script>
+</body>
+</html>
