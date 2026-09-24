@@ -1,7 +1,6 @@
 """
 Midara Utilities - Document & Image Compression / Conversion
-Open-source web app (Flask + Pillow + pypdf)
-Ready for GitHub + Render deployment
+Works with flat folder structure (index.html + styles.css in root)
 """
 
 import os
@@ -12,19 +11,18 @@ from pathlib import Path
 
 from flask import (
     Flask, render_template, request, send_file,
-    jsonify, after_this_request
+    jsonify, after_this_request, send_from_directory
 )
 from werkzeug.utils import secure_filename
 from PIL import Image
 from pypdf import PdfReader, PdfWriter
 
 # ---------------------------------------------------------------------------
-# Config
+# Config – flat structure
 # ---------------------------------------------------------------------------
-app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB limit
+app = Flask(__name__, template_folder='.', static_folder='.')
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB
 
-# Use system temp on Render (ephemeral filesystem)
 UPLOAD_FOLDER = Path(tempfile.gettempdir()) / "midara_uploads"
 OUTPUT_FOLDER = Path(tempfile.gettempdir()) / "midara_outputs"
 UPLOAD_FOLDER.mkdir(exist_ok=True)
@@ -42,7 +40,7 @@ def get_file_size(path: Path) -> int:
 
 
 # ---------------------------------------------------------------------------
-# DOCX compression (stays DOCX)
+# DOCX compression
 # ---------------------------------------------------------------------------
 def compress_docx(input_path: Path, output_path: Path, quality: int = 70) -> dict:
     original_size = get_file_size(input_path)
@@ -179,6 +177,11 @@ def compress_image(
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/styles.css")
+def styles():
+    return send_from_directory(".", "styles.css")
 
 
 @app.route("/api/process", methods=["POST"])
